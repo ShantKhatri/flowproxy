@@ -1,0 +1,117 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: flowproxy
+      POSTGRES_USER: flowproxy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowproxy"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M }
+    networks: [flowproxy-net]
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M }
+    networks: [flowproxy-net]
+
+  upstream:
+    image: kennethreitz/httpbin
+    networks: [flowproxy-net]
+
+  proxy:
+    build:
+      context: ..
+      dockerfile: Dockerfile.proxy
+    ports: ["8080:8080"]
+    environment:
+      UPSTREAM_URL: ${UPSTREAM_URL}
+      LISTEN_ADDR: ${LISTEN_ADDR}
+      REDIS_ADDR: ${REDIS_ADDR}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_FAILURE_MODE: ${REDIS_FAILURE_MODE}
+      POSTGRES_DSN: ${POSTGRES_DSN}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp, /var/run]
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M }
+    networks: [flowproxy-net]
+
+  alert-worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile.alertworker
+    environment:
+      POSTGRES_DSN: ${POSTGRES_DSN}
+      ALERT_SLACK_WEBHOOK: ${ALERT_SLACK_WEBHOOK:-}
+      ALERT_INTERVAL: ${ALERT_INTERVAL:-30s}
+    depends_on:
+      postgres: { condition: service_healthy }
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp]
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 128M }
+    networks: [flowproxy-net]
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports: ["9090:9090"]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M }
+    networks: [flowproxy-net]
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    ports: ["3000:3000"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./grafana/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml:ro
+    security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M }
+    networks: [flowproxy-net]
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  flowproxy-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

@@ -1,0 +1,58 @@
+{
+  "title": "FlowProxy",
+  "uid": "flowproxy",
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "title": "Requests/sec", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [{ "expr": "sum(rate(flowproxy_requests_total[1m]))", "legendFormat": "req/s" }],
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+    },
+    {
+      "id": 2, "title": "Rate Limit Hits/sec", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [{ "expr": "sum(rate(flowproxy_rate_limited_total[1m]))", "legendFormat": "429/s" }],
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+    },
+    {
+      "id": 3, "title": "Active Connections", "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+      "targets": [{ "expr": "flowproxy_active_connections", "legendFormat": "active" }],
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+    },
+    {
+      "id": 4, "title": "Upstream Latency", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(flowproxy_upstream_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(flowproxy_upstream_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(flowproxy_upstream_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+      ],
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 5, "title": "Error Rate %", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [{ "expr": "sum(rate(flowproxy_requests_total{status_code=~\"5..\"}[1m])) / sum(rate(flowproxy_requests_total[1m])) * 100", "legendFormat": "5xx %" }],
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "percent" } }
+    },
+    {
+      "id": 6, "title": "Top Rate-Limited Clients", "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [{ "expr": "topk(5, sum by(client_id)(rate(flowproxy_rate_limited_total[5m])))", "format": "table", "instant": true }],
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+    }
+  ],
+  "templating": {
+    "list": [{
+      "name": "DS_PROMETHEUS", "type": "datasource",
+      "query": "prometheus", "current": { "text": "Prometheus", "value": "Prometheus" }
+    }]
+  },
+  "schemaVersion": 39
+}

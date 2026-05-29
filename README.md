@@ -8,7 +8,7 @@ FlowProxy sits in front of any HTTP service and enforces traffic policies withou
 
 - **Per-client, per-route rate limiting** - Redis sliding window (sorted sets + atomic Lua script)
 - **Dynamic config** - rate limits stored in Postgres, hot-reloaded every 30s without restart
-- **Async request logging** - buffered channel → batch insert to Postgres (zero latency impact)
+- **Async request logging** - buffered channel -> batch insert to Postgres (zero latency impact)
 - **Anomaly detection** - background worker fires Slack alerts on traffic spikes, error surges, abuse
 - **Prometheus metrics** - `/metrics` endpoint with 7 metrics, pre-built Grafana dashboard
 - **Graceful shutdown** - drains in-flight requests, flushes log buffer, exits cleanly on SIGTERM
@@ -37,10 +37,10 @@ make up
 
 # 4. Verify
 curl http://localhost:8080/healthz
-# → {"status":"ok"}
+# -> {"status":"ok"}
 
 curl http://localhost:8080/get
-# → proxied response from upstream httpbin
+# -> proxied response from upstream httpbin
 ```
 
 ### Run Without Docker (Development)
@@ -63,7 +63,7 @@ curl http://localhost:8080/get
 | **prometheus** | 9090 | http://localhost:9090 | Metrics explorer |
 | postgres | - | internal only | Config store, request logs |
 | redis | - | internal only | Rate limit counters |
-| alert-worker | - | no ports | Anomaly detection → Slack alerts |
+| alert-worker | - | no ports | Anomaly detection -> Slack alerts |
 | upstream | - | internal only | httpbin test backend |
 
 ## Testing
@@ -181,12 +181,12 @@ hey -n 2000 -c 100 http://localhost:8080/get
 ## Architecture
 
 ```
-Client → :8080 → [Logger → RateLimit → Metrics → ReverseProxy] → Upstream
-                      │          │          │
-                   Postgres    Redis    Prometheus → Grafana
+Client -> :8080 -> [Logger -> RateLimit -> Metrics -> ReverseProxy] -> Upstream
+                      |          |          |
+                   Postgres    Redis    Prometheus -> Grafana
                    (logs)   (counters)  (metrics)
-                      ↑
-                  Alert Worker (polls anomalies → Slack)
+                      ^
+                  Alert Worker (polls anomalies -> Slack)
 ```
 
 ### Middleware Chain
@@ -290,3 +290,7 @@ make seed       # Insert test route into Postgres
 - **Resource limits** - CPU and memory caps on every service
 - **CVE scanning** - GitHub Actions runs Trivy on every push
 - **DSN redaction** - Postgres password masked in log output
+
+## License
+
+Apache 2.0

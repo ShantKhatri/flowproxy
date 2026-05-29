@@ -1,58 +1,232 @@
 {
-  "title": "FlowProxy",
-  "uid": "flowproxy",
+  "title": "FlowProxy: Critical Overview",
+  "uid": "flowproxy-critical",
   "timezone": "browser",
   "refresh": "5s",
   "time": { "from": "now-15m", "to": "now" },
+  "schemaVersion": 39,
   "panels": [
     {
-      "id": 1, "title": "Requests/sec", "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "targets": [{ "expr": "sum(rate(flowproxy_requests_total[1m]))", "legendFormat": "req/s" }],
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
-    },
-    {
-      "id": 2, "title": "Rate Limit Hits/sec", "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "targets": [{ "expr": "sum(rate(flowproxy_rate_limited_total[1m]))", "legendFormat": "429/s" }],
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
-    },
-    {
-      "id": 3, "title": "Active Connections", "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
-      "targets": [{ "expr": "flowproxy_active_connections", "legendFormat": "active" }],
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
-    },
-    {
-      "id": 4, "title": "Upstream Latency", "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "id": 1,
+      "title": "SYSTEM HEALTH: 5xx Error Rate",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum(rate(flowproxy_upstream_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
-        { "expr": "histogram_quantile(0.95, sum(rate(flowproxy_upstream_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
-        { "expr": "histogram_quantile(0.99, sum(rate(flowproxy_upstream_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+        {
+          "expr": "sum(rate(flowproxy_requests_total{status_code=~\"5..\"}[1m])) / sum(rate(flowproxy_requests_total[1m])) * 100 or vector(0)",
+          "legendFormat": "Error Rate"
+        }
       ],
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "s" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": { "mode": "background" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "dark-green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "dark-red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "value"
+      }
     },
     {
-      "id": 5, "title": "Error Rate %", "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
-      "targets": [{ "expr": "sum(rate(flowproxy_requests_total{status_code=~\"5..\"}[1m])) / sum(rate(flowproxy_requests_total[1m])) * 100", "legendFormat": "5xx %" }],
+      "id": 2,
+      "title": "ACTIVE DEFENSE: 429 Rate Limits / sec",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(flowproxy_rate_limited_total[1m])) or vector(0)",
+          "legendFormat": "Blocked / sec"
+        }
+      ],
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "percent" } }
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "background" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "dark-green", "value": null },
+              { "color": "semi-dark-orange", "value": 1 },
+              { "color": "dark-red", "value": 20 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "value"
+      }
     },
     {
-      "id": 6, "title": "Top Rate-Limited Clients", "type": "table",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-      "targets": [{ "expr": "topk(5, sum by(client_id)(rate(flowproxy_rate_limited_total[5m])))", "format": "table", "instant": true }],
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+      "id": 3,
+      "title": "CRITICAL: Dropped Logs",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(flowproxy_dropped_logs_total[1m])) or vector(0)",
+          "legendFormat": "Dropped / sec"
+        }
+      ],
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "background" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "dark-green", "value": null },
+              { "color": "dark-red", "value": 0.1 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Throughput vs Critical Errors (5xx)",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "expr": "sum(rate(flowproxy_requests_total[1m]))",
+          "legendFormat": "Total Req/s"
+        },
+        {
+          "expr": "sum(rate(flowproxy_requests_total{status_code=~\"5..\"}[1m]))",
+          "legendFormat": "5xx Errors/s"
+        }
+      ],
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 15,
+            "lineWidth": 2
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "5xx Errors/s" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
+              { "id": "custom.fillOpacity", "value": 40 },
+              { "id": "custom.lineWidth", "value": 3 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Total Req/s" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "title": "Upstream Latency (p99 Alerting)",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 6 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(flowproxy_upstream_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(flowproxy_upstream_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99"
+        }
+      ],
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 10, "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "p99" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
+              { "id": "custom.lineWidth", "value": 3 }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Top Abusive Clients (Rate Limited)",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "topk(10, sum by(client_id)(rate(flowproxy_rate_limited_total[5m])))",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "color-background" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      }
     }
   ],
   "templating": {
-    "list": [{
-      "name": "DS_PROMETHEUS", "type": "datasource",
-      "query": "prometheus", "current": { "text": "Prometheus", "value": "Prometheus" }
-    }]
-  },
-  "schemaVersion": 39
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" }
+      }
+    ]
+  }
 }
